@@ -1,0 +1,43 @@
+name: build-mac
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        working-directory: MacWordBuddy
+        run: swift test
+
+      - name: Build release
+        working-directory: MacWordBuddy
+        run: swift build -c release
+
+      - name: Package .app
+        working-directory: MacWordBuddy
+        run: |
+          APP="字数小助手.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cp scripts/Info.plist "$APP/Contents/Info.plist"
+          cp .build/release/WordBuddyMac "$APP/Contents/MacOS/WordBuddyMac"
+          codesign --force --deep -s - "$APP"
+
+      - name: Create DMG
+        working-directory: MacWordBuddy
+        run: |
+          DMG="字数小助手-Mac-1.0.0.dmg"
+          rm -f "$DMG"
+          hdiutil create -volname "字数小助手" -srcfolder "字数小助手.app" -ov -format UDZO "$DMG"
+          ls -la "$DMG"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WordBuddyMac-DMG
+          path: MacWordBuddy/字数小助手-Mac-1.0.0.dmg
